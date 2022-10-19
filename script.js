@@ -8,6 +8,7 @@ collisionCanvas.width = window.innerWidth;
 collisionCanvas.height = window.innerHeight;
 
 let score = 0;
+let gameOver = false;
 ctx.font = "50px Impact";
 
 let timeToNextRaven = 0;
@@ -49,11 +50,42 @@ class Raven {
             else this.frame++;
             this.timeSinceFlap = 0;
         }
+        if(this.x < 0 - this.width) gameOver = true;
     }
     draw(){
         collisionCtx.fillStyle = this.color;
         collisionCtx.fillRect(this.x, this.y, this.width, this.height);
         ctx.drawImage(this.image, this.frame * this.spriteWidth, 0, this.spriteWidth, this.spriteHeight, this.x, this.y, this.width, this.height);
+    }
+}
+let explosion = [];
+class Explosion {
+    constructor(x, y, size){
+        this.image = new Image();
+        this.image.src = "boom.png";
+        this.spriteWidth = 200;
+        this.spriteHeight = 179;
+        this.size = size;
+        this.x = x;
+        this.y = y;
+        this.frame = 0;
+        this.sound = new Audio();
+        this.sound.src = "boom.wav";
+        this.timeSinceLastFrame = 0;
+        this.frameInterval = 100;
+        this.markedForDeletion = false;
+    }
+    update(deltatime){
+        if(this.frame === 0) this.sound.play();
+        this.timeSinceLastFrame += deltatime;
+        if (this.timeSinceLastFrame > this.frameInterval){
+            this.frame++;
+            this.timeSinceLastFrame = 0;
+            if(this.frame > 5) this.markedForDeletion = true;
+        }
+    }
+    draw(){
+        ctx.drawImage(this.image, this.frame * this.spriteWidth, 0, this.spriteWidth, this.spriteHeight, this.x, this.y - this.size/4, this.size, this.size);
     }
 }
 
@@ -63,6 +95,13 @@ function drawScore(){
     ctx.fillStyle = "white";
     ctx.fillText("Score: " + score, 55, 75);
 }
+function drawGameOver(){
+    ctx.textAlign = "center"
+    ctx.fillStyle = "black";
+    ctx.fillText("GAME OVER, your score is " + score, canvas.width/2, canvas.height/2);
+    ctx.fillStyle = "white";
+    ctx.fillText("GAME OVER, your score is " + score, canvas.width / 2 + 5, canvas.height / 2 + 5);
+}
 
 window.addEventListener("click", function(e){
     const detectPixelColor = collisionCtx.getImageData(e.x, e.y, 1, 1);
@@ -70,8 +109,10 @@ window.addEventListener("click", function(e){
     const pc = detectPixelColor.data;
     ravens.forEach(object => {
         if(object.randomColors[0] === pc[0] && object.randomColors[1] === pc[1] && object.randomColors[2] === pc[2]){
+            //collision detected
             object.markedForDeletion = true;
             score++;
+            explosion.push(new Explosion(object.x, object.y, object.width));
         }
     });
 });
@@ -91,9 +132,11 @@ function animate(timestamp){
         })
     }
     drawScore();
-    [...ravens].forEach(object => object.update(deltatime));
-    [...ravens].forEach(object => object.draw());
-    ravens = ravens.filter(object => !object.markedForDeletion)
-    requestAnimationFrame(animate);
-}
+    [...ravens, ...explosion].forEach(object => object.update(deltatime));
+    [...ravens, ...explosion].forEach(object => object.draw());
+    ravens = ravens.filter(object => !object.markedForDeletion);
+    explosion = explosion.filter(object => !object.markedForDeletion);
+    if (!gameOver) requestAnimationFrame(animate);
+    else drawGameOver();
+}   
 animate(0);
